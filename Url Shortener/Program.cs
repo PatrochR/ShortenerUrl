@@ -1,8 +1,10 @@
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Url_Shortener;
 using Url_Shortener.Entities;
 using Url_Shortener.Models;
 using Url_Shortener.Services;
+using Url_Shortener.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationContext>(o => o.UseSqlite("Data Source=Url.db"));
 
 builder.Services.AddScoped<UrlShorteningServices>();
+builder.Services.AddScoped<IValidator<RegisterRequest> , RegisterRequestValidator>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddCors(options =>
 {
@@ -23,12 +27,16 @@ builder.Services.AddCors(options =>
         });
 });
 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
 app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
+
+//EndPoints 
+
 app.MapPost("api/shorten", async (
     ShortenUrlRequest request,
     UrlShorteningServices urlShorteningServices,
@@ -67,6 +75,18 @@ app.MapGet("api/{code}", async (string code , ApplicationContext context) =>
         return Results.NotFound();
     }
     return Results.Redirect(shortenedUrl.LongUrl);
+});
+
+app.MapPost("api/register", async (RegisterRequest request, IValidator<RegisterRequest> validator , UserService _userService) =>
+{
+    var validationResult = await validator.ValidateAsync(request);
+    if (!validationResult.IsValid)
+    {
+        return Results.BadRequest("register request is not valid !");
+    }
+    
+    return await _userService.Register(request.Username , request.Password) ? Results.Ok("User Add") : Results.BadRequest("Error");
+    
 });
 
 app.Run();
