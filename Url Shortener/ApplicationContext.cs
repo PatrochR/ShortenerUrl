@@ -9,6 +9,8 @@ namespace Url_Shortener
         public ApplicationContext(DbContextOptions options):base (options) { }
 
         public DbSet<ShortenedUrl> ShortenedUrls { get; set; }
+        public DbSet<User> Users { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
