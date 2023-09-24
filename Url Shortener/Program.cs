@@ -5,6 +5,9 @@ using Url_Shortener.Entities;
 using Url_Shortener.Models;
 using Url_Shortener.Services;
 using Url_Shortener.Validation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +17,18 @@ builder.Services.AddDbContext<ApplicationContext>(o => o.UseSqlite("Data Source=
 
 builder.Services.AddScoped<UrlShorteningServices>();
 builder.Services.AddScoped<IValidator<RegisterRequest> , RegisterRequestValidator>();
+builder.Services.AddScoped<IValidator<LoginRequest> , LoginRequestValidator>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddAuthentication().AddJwtBearer(option =>
+{
+    option.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        ValidateAudience = false,
+        ValidateIssuer = false,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("this world shell know pain"))
+    };
+});
 
 builder.Services.AddCors(options =>
 {
@@ -77,7 +91,7 @@ app.MapGet("api/{code}", async (string code , ApplicationContext context) =>
     return Results.Redirect(shortenedUrl.LongUrl);
 });
 
-app.MapPost("api/register", async (RegisterRequest request, IValidator<RegisterRequest> validator , UserService _userService) =>
+app.MapPost("api/register", async (RegisterRequest request, IValidator<RegisterRequest> validator , IUserService _userService) =>
 {
     var validationResult = await validator.ValidateAsync(request);
     if (!validationResult.IsValid)
@@ -87,6 +101,27 @@ app.MapPost("api/register", async (RegisterRequest request, IValidator<RegisterR
     
     return await _userService.Register(request.Username , request.Password) ? Results.Ok("User Add") : Results.BadRequest("Error");
     
+});
+
+app.MapPost("api/login", async (LoginRequest request , IValidator<LoginRequest> validator , IUserService _userService) =>
+{
+    var validationResult = await validator.ValidateAsync(request);
+    if(!validationResult.IsValid)
+    {
+        return Results.BadRequest("login request is not valid");
+    }
+    var user = _userService.FindUser(request.Username);
+    if (user.Result is null) 
+    {
+        return Results.BadRequest("User no exist");
+    }
+    if (!BCrypt.Net.BCrypt.Verify(request.Password ,user.Result.PasswordHash ))
+    {
+        return Results.BadRequest("User no exist");
+    }
+    string token;
+    _userService.Login(user.Result, out token);
+    return Results.Ok(token);
 });
 
 app.Run();
