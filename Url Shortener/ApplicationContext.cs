@@ -21,6 +21,11 @@ namespace Url_Shortener
                 builder.HasIndex(s => s.Code).IsUnique();
             });
 
+            modelBuilder.Entity<User>(builder => 
+            {
+                builder.HasIndex(u => u.UserName).IsUnique();
+            });
+
             base.OnModelCreating(modelBuilder);
         }
     }
